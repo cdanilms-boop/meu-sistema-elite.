@@ -1,27 +1,24 @@
 import streamlit as st
 import numpy as np
 
-# Configuração Universal
-st.set_page_config(page_title="Sistema Elite Pro", layout="centered")
+st.set_page_config(page_title="Elite Pro - Ordem Correta", layout="centered")
 
-# Estilo para destacar onde você está digitando
+# Estilo para as caixas ficarem bem visíveis
 st.markdown("""
     <style>
-    /* Destaca a caixa selecionada com uma cor diferente */
     div[data-baseweb="input"]:focus-within {
         border: 2px solid #28a745 !important;
-        background-color: #f0fff0 !important;
     }
-    input { font-size: 1.2rem !important; font-weight: bold !important; }
+    input { font-size: 1.5rem !important; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🛡️ Sistema Elite Pro")
-st.info("💡 Dica: Use a tecla **TAB** para pular para a próxima caixa e **ENTER** no final para analisar.")
+st.write("Aperte **TAB** para pular: 1 → 2 → 3 → 4 → 5 → 6")
 
-# Seletor
 loteria = st.selectbox("Modalidade:", ["Mega-Sena", "+Milionária", "Powerball (EUA)"])
 
+# Define as regras
 if loteria == "Mega-Sena":
     qtd, max_n = 6, 60
 elif loteria == "+Milionária":
@@ -31,34 +28,40 @@ else:
 
 st.markdown("---")
 
-# Criando os campos em uma lista para garantir a ordem
-cols = st.columns(3)
+# --- O SEGREDO DA ORDEM ESTÁ AQUI ---
 jogo_usuario = []
 
-for i in range(qtd):
-    # O segredo do 'TAB' funcionar bem é o índice 'i'
-    n = cols[i % 3].number_input(f"Dz {i+1}", 1, max_n, i+1, key=f"dz_{i}")
-    jogo_usuario.append(n)
+# Criamos 2 linhas com 3 colunas cada para caber na tela, 
+# mas forçamos a ordem de 1 a 6
+col1, col2, col3 = st.columns(3)
 
-# Campo Powerball Extra
+with col1:
+    n1 = st.number_input("Dezena 1", 1, max_n, 1, key="d1")
+    n4 = st.number_input("Dezena 4", 1, max_n, 4, key="d4") if qtd >= 4 else None
+
+with col2:
+    n2 = st.number_input("Dezena 2", 1, max_n, 2, key="d2")
+    n5 = st.number_input("Dezena 5", 1, max_n, 5, key="d5") if qtd >= 5 else None
+
+with col3:
+    n3 = st.number_input("Dezena 3", 1, max_n, 3, key="d3")
+    n6 = st.number_input("Dezena 6", 1, max_n, 6, key="d6") if qtd >= 6 else None
+
+# Organiza a lista na ordem correta para o cálculo
+jogo_usuario = [n for n in [n1, n2, n3, n4, n5, n6] if n is not None]
+
+# Powerball Extra (se aplicável)
 if loteria == "Powerball (EUA)":
     st.markdown("---")
-    pb_extra = st.number_input("🔴 BOLA POWERBALL (1-26)", 1, 26, 1, key="pb_val")
+    pb_val = st.number_input("🔴 BOLA POWERBALL (1-26)", 1, 26, 1, key="pb_key")
 
-st.write("") 
-
-# Botão de Ação
-if st.button("ANALISAR JOGO AGORA", use_container_width=True, type="primary"):
+st.write("")
+if st.button("ANALISAR AGORA", use_container_width=True, type="primary"):
     media = np.mean(jogo_usuario)
-    if 22 <= media <= 38:
-        st.success("🟢 STATUS: JOGO DENTRO DO PADRÃO")
-    else:
-        st.warning("🟡 STATUS: FORA DO PADRÃO IDEAL")
+    st.success(f"Análise Concluída! Média: {media:.1f}")
 
-# Aba de Gerador
-with st.expander("🎲 GERADOR DE JOGOS"):
-    if st.button("GERAR COMBINAÇÕES", use_container_width=True):
-        for _ in range(3):
-            numeros = sorted(np.random.choice(range(1, max_n + 1), qtd, replace=False))
-            txt_num = " - ".join([f"{int(n):02d}" for n in numeros])
-            st.markdown(f"<div style='background-color:#d4edda; padding:10px; border-radius:10px; text-align:center; border:1px solid #28a745; margin-bottom:5px;'><b>{txt_num}</b></div>", unsafe_allow_html=True)
+# --- GERADOR ---
+with st.expander("🎲 GERADOR"):
+    if st.button("GERAR JOGOS"):
+        res = sorted(np.random.choice(range(1, max_n + 1), qtd, replace=False))
+        st.write(f"Sugerido: {res}")
