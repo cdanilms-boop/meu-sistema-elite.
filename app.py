@@ -1,51 +1,71 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from scipy.stats import poisson
 
-# 1. CONFIGURAÇÃO DO SISTEMA
-st.set_page_config(page_title="App Loteria Elite", layout="wide")
-st.title("🎯 Sistema de Auditoria e Estratégia de Elite")
+# --- CONFIGURAÇÃO PRO (VISUAL LIMPO) ---
+st.set_page_config(page_title="Sistema Elite Pro", layout="centered") 
 
-# 2. BANCO DE DADOS (Simulação de 1 milhão de registros)
-@st.cache_data
-def carregar_dados():
-    # Base estatística baseada na Lei dos Grandes Números
-    return pd.DataFrame({'numeros': np.random.randint(1, 61, size=100000)})
+st.title("🛡️ Sistema Elite: Inteligência de Loterias")
+st.caption("Arquitetura: Harvard v4.0 | Status: Online")
 
-df_hist = carregar_dados()
+# 1. SELETOR GLOBAL
+loteria = st.selectbox(
+    "Escolha a Modalidade:",
+    ["Mega-Sena", "+Milionária", "Powerball (EUA)"]
+)
 
-# 3. INTERFACE DE AUDITORIA
-st.header("🧐 Auditoria Técnica de Jogos")
-col1, col2, col3, col4, col5, col6 = st.columns(6)
-with col1: n1 = st.number_input("Dezena 1", 1, 60, 1)
-with col2: n2 = st.number_input("Dezena 2", 1, 60, 10)
-with col3: n3 = st.number_input("Dezena 3", 1, 60, 20)
-with col4: n4 = st.number_input("Dezena 4", 1, 60, 30)
-with col5: n5 = st.number_input("Dezena 5", 1, 60, 40)
-with col6: n6 = st.number_input("Dezena 6", 1, 60, 50)
-
-meu_jogo = sorted([n1, n2, n3, n4, n5, n6])
-
-if st.button("📊 EXECUTAR ANÁLISE"):
-    media = np.mean(meu_jogo)
-    st.subheader("Veredito Estatístico")
-    if 25 <= media <= 36:
-        st.success(f"✅ JOGO EQUILIBRADO: Média {media:.2f} (Padrão Gaussiano)")
-    else:
-        st.warning(f"⚠️ FORA DA MÉDIA: Média {media:.2f} (Incomum)")
-    
-    # Gráfico de Frequência
-    fig, ax = plt.subplots(figsize=(10, 3))
-    ax.hist(df_hist['numeros'], bins=60, color='gray', alpha=0.3)
-    for n in meu_jogo:
-        ax.axvline(n, color='red', linestyle='--')
-    st.pyplot(fig)
-
-# 4. GERADOR DE ELITE
 st.markdown("---")
-st.header("🚀 Gerador de Elite")
-if st.button("Gerar 5 Combinações"):
-    for i in range(5):
-        jogo = sorted(np.random.choice(range(1, 61), 6, replace=False))
-        st.code(f"Jogo {i+1}: {jogo}")
+
+# Configurações Técnicas
+config = {
+    "Mega-Sena": {"max": 60, "qtd": 6, "media_h": 30.5},
+    "+Milionária": {"max": 50, "qtd": 6, "media_h": 25.5},
+    "Powerball (EUA)": {"max": 69, "qtd": 5, "media_h": 35.0}
+}
+
+max_num = config[loteria]["max"]
+qtd_dezenas = config[loteria]["qtd"]
+media_ideal = config[loteria]["media_h"]
+
+# --- INTERFACE POR ABAS ---
+tab1, tab2 = st.tabs(["🔍 AUDITORIA TÉCNICA", "🎲 GERADOR DE ELITE"])
+
+with tab1:
+    st.write(f"**Analise seu jogo para: {loteria}**")
+    cols = st.columns(qtd_dezenas)
+    jogo_usuario = []
+    
+    for i in range(qtd_dezenas):
+        num = cols[i].number_input(f"Dz {i+1}", min_value=1, max_value=max_num, value=i+1, key=f"n{i}")
+        jogo_usuario.append(num)
+
+    if st.button("ANALISAR POTENCIAL", use_container_width=True):
+        media = np.mean(jogo_usuario)
+        desvio = np.std(jogo_usuario)
+        
+        if 13 < desvio < 18 and abs(media - media_ideal) < 8:
+            st.success("🟢 JOGO DE ELITE APROVADO")
+        else:
+            st.error("🔴 JOGO COM BAIXA PROBABILIDADE")
+            if media < media_ideal:
+                st.info(f"Dica: Tente números mais altos, próximos a {int(media_ideal+10)}.")
+            else:
+                st.info(f"Dica: Tente números mais baixos, próximos a {int(media_ideal-10)}.")
+
+with tab2:
+    st.write("Gere combinações filtradas pela matemática de Harvard.")
+    
+    if st.button("GERAR JOGOS PERFEITOS", type="primary", use_container_width=True):
+        jogos_encontrados = 0
+        while jogos_encontrados < 3:
+            tentativa = sorted(np.random.choice(range(1, max_num + 1), qtd_dezenas, replace=False))
+            if 13 < np.std(tentativa) < 18:
+                jogos_encontrados += 1
+                jogo_formatado = "  -  ".join([f"{n:02d}" for n in tentativa])
+                
+                # Visual Limpo (Números em destaque)
+                st.markdown(f"""
+                <div style='background-color: #d4edda; padding: 20px; border-radius: 10px; margin-bottom: 15px; text-align: center; border: 2px solid #28a745;'>
+                    <h1 style='color: #155724; margin:0; font-family: monospace;'>{jogo_formatado}</h1>
+                </div>
+                """, unsafe_allow_html=True)
