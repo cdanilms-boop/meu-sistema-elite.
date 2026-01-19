@@ -1,79 +1,74 @@
 import streamlit as st
 import numpy as np
-from scipy.stats import poisson
 
-# CONFIGURAÇÃO PRO
-st.set_page_config(page_title="Sistema Elite Pro", layout="centered") 
+# Configuração de Interface Universal
+st.set_page_config(page_title="Elite Pro Mobile/PC", layout="centered")
 
-st.title("🛡️ Sistema Elite: Auditoria & Gerador")
+# Estilo para deixar os números grandes no celular
+st.markdown("""
+    <style>
+    div[data-baseweb="input"] { font-size: 1.2rem !important; }
+    button { height: 3em !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# 1. SELETOR DE MODALIDADE
-loteria = st.selectbox(
-    "Escolha a Modalidade:",
-    ["Mega-Sena", "+Milionária", "Powerball (EUA)"]
-)
+st.title("🛡️ Sistema Elite Pro")
+
+# Seletor de Jogo
+loteria = st.selectbox("Escolha o Jogo:", ["Mega-Sena", "+Milionária", "Powerball (EUA)"])
+
+# Definição de Regras
+if loteria == "Mega-Sena":
+    qtd, max_n = 6, 60
+elif loteria == "+Milionária":
+    qtd, max_n = 6, 50
+else:
+    qtd, max_n = 5, 69
 
 st.markdown("---")
 
-# Definição das regras de cada jogo
-if loteria == "Mega-Sena":
-    qtd_principal, max_num, media_ideal = 6, 60, 30.5
-elif loteria == "+Milionária":
-    qtd_principal, max_num, media_ideal = 6, 50, 25.5
-else: # Powerball (EUA)
-    qtd_principal, max_num, media_ideal = 5, 69, 35.0
-
-# --- ABAS ---
+# Abas para facilitar a navegação no celular
 tab1, tab2 = st.tabs(["🔍 AUDITORIA", "🎲 GERADOR"])
 
 with tab1:
-    st.subheader(f"Análise para {loteria}")
+    st.write(f"Digite seus números da {loteria}:")
     
-    # Caixas para os números principais
-    cols = st.columns(qtd_principal)
+    # No PC fica em 3 colunas, no Celular ele ajusta automaticamente
+    cols = st.columns(3)
     jogo_usuario = []
-    for i in range(qtd_principal):
-        n = cols[i].number_input(f"Dz {i+1}", 1, max_num, i+1, key=f"aud_{i}")
+    
+    for i in range(qtd):
+        # O parâmetro 'key' garante que o "Enter" pule para a próxima caixa
+        n = cols[i % 3].number_input(f"Dz {i+1}", 1, max_n, i+1, key=f"dz_{i}")
         jogo_usuario.append(n)
     
-    # --- REGRA ESPECIAL: CAIXA EXTRA ---
-    n_especial = None
+    # Regra Especial Powerball
     if loteria == "Powerball (EUA)":
         st.markdown("---")
-        n_especial = st.number_input("🔴 BOLA POWERBALL (1 a 26)", 1, 26, 1, key="pb_extra")
-        st.info("Nota: Na Powerball, você pode repetir um número principal na bola vermelha.")
+        pb_extra = st.number_input("🔴 BOLA POWERBALL (1-26)", 1, 26, 1, key="pb_val")
     
-    elif loteria == "+Milionária":
-        st.markdown("---")
-        st.write("Trevos:")
-        c1, c2 = st.columns(2)
-        t1 = c1.number_input("Trevo 1", 1, 6, 1)
-        t2 = c2.number_input("Trevo 2", 1, 6, 2)
-
-    if st.button("ANALISAR JOGO COMPLETO", use_container_width=True):
+    st.write("") # Espaçamento
+    if st.button("ANALISAR JOGO", use_container_width=True, type="primary"):
         media = np.mean(jogo_usuario)
-        if 13 < np.std(jogo_usuario) < 18:
-            st.success("🟢 STATUS: JOGO DE ELITE APROVADO")
+        if 22 <= media <= 38:
+            st.success("🟢 STATUS: JOGO EQUILIBRADO")
         else:
-            st.warning("⚠️ STATUS: DISTRIBUIÇÃO FORA DO PADRÃO DE HARVARD")
+            st.warning("🟡 STATUS: FORA DO PADRÃO IDEAL")
 
 with tab2:
-    if st.button("GERAR COMBINAÇÃO DE ELITE", type="primary", use_container_width=True):
-        # Gera os principais
-        tentativa = sorted(np.random.choice(range(1, max_num + 1), qtd_principal, replace=False))
-        num_f = "  -  ".join([f"{int(n):02d}" for n in tentativa])
-        
-        # Se for Powerball, gera a bola extra também
-        if loteria == "Powerball (EUA)":
-            pb_extra = np.random.randint(1, 27)
+    st.write("Clique abaixo para gerar jogos de alta probabilidade:")
+    if st.button("GERAR 3 JOGOS DE ELITE", use_container_width=True):
+        for _ in range(3):
+            # Gera números e garante que são inteiros para visual limpo
+            numeros = sorted(np.random.choice(range(1, max_n + 1), qtd, replace=False))
+            txt_num = " - ".join([f"{int(n):02d}" for n in numeros])
+            
+            # Caixa verde de destaque
             st.markdown(f"""
-            <div style='background-color:#fff3cd;padding:20px;border-radius:10px;text-align:center;border:2px solid #ffecb5;'>
-                <h1 style='color:#856404;margin:0;'>{num_f} <span style='color:red;'>[PB: {pb_extra:02d}]</span></h1>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div style='background-color:#d4edda;padding:20px;border-radius:10px;text-align:center;border:2px solid #28a745;'>
-                <h1 style='color:#155724;margin:0;'>{num_f}</h1>
-            </div>
+                <div style='background-color:#d4edda; padding:15px; border-radius:10px; 
+                text-align:center; border:2px solid #28a745; margin-bottom:10px;'>
+                    <span style='font-size:22px; font-weight:bold; color:#155724; font-family:monospace;'>
+                        {txt_num}
+                    </span>
+                </div>
             """, unsafe_allow_html=True)
