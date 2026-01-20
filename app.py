@@ -4,41 +4,46 @@ from datetime import datetime
 import random
 
 # --- CONFIGURAÇÃO DE ENGENHARIA ---
-st.set_page_config(page_title="SISTEMA ELITE PRO - FINAL", layout="wide")
+st.set_page_config(page_title="SISTEMA ELITE PRO - TESTE 1", layout="wide")
 
-# Inicialização da Memória (Não apaga enquanto a sessão durar)
 if 'banco_de_dados' not in st.session_state:
     st.session_state.banco_de_dados = []
 
-st.title("🚀 SISTEMA ELITE PRO - VERSÃO ESTÁVEL")
+# SIMULAÇÃO DE BANCO DE DADOS REAL (Para o Teste 1)
+# Aqui colocamos alguns resultados reais históricos para testar o motor
+dados_oficiais = {
+    "Mega-Sena": [
+        [5, 9, 32, 44, 49, 57], # Concurso 2700
+        [1, 11, 19, 20, 28, 37], # Concurso 2701
+        [2, 9, 11, 25, 43, 51]   # Concurso 2702
+    ]
+}
 
-# --- 1. PAINEL DE CONTROLE (LATERAL) ---
-st.sidebar.header("Configuração")
-modalidade = st.sidebar.selectbox("Loteria Ativa:", ["Mega-Sena", "Lotofácil", "Powerball"])
+st.title("🚀 SISTEMA ELITE PRO - TESTE DE RESPOSTA")
 
-# Regras Fixas da Metodologia
+# --- 1. CONFIGURAÇÃO ---
+modalidade = st.sidebar.selectbox("Loteria Ativa:", ["Mega-Sena", "Lotofácil"])
 regras = {
     "Mega-Sena": {"min": 150, "max": 220, "qtd": 6, "max_n": 60},
-    "Lotofácil": {"min": 170, "max": 220, "qtd": 15, "max_n": 25},
-    "Powerball": {"min": 130, "max": 200, "qtd": 5, "max_n": 69}
+    "Lotofácil": {"min": 170, "max": 220, "qtd": 15, "max_n": 25}
 }
 conf = regras[modalidade]
 
-# --- 2. GERADOR DE JOGOS ELITE (FIXO NO TOPO) ---
+# --- 2. GERADOR DE ELITE ---
 st.subheader(f"🎲 Gerador Automático ({modalidade})")
-if st.button("✨ GERAR JOGO PELA METODOLOGIA"):
+if st.button("✨ GERAR E ANALISAR"):
     tentativas = 0
-    while tentativas < 100:
+    while tentativas < 50:
         sugestao = sorted(random.sample(range(1, conf['max_n'] + 1), conf['qtd']))
         if conf['min'] <= sum(sugestao) <= conf['max']:
-            st.success(f"Jogo Elite Gerado: **{sugestao}** | Soma: {sum(sugestao)}")
+            st.success(f"Sugestão Gerada: **{sugestao}** | Soma: {sum(sugestao)}")
             break
         tentativas += 1
 
 st.divider()
 
-# --- 3. AUDITORIA MANUAL (FIXA) ---
-st.subheader("📝 Analisador de Números")
+# --- 3. ANALISADOR E COMPARADOR (O TESTE DO MOTOR) ---
+st.subheader("📝 Analisador com Busca Histórica")
 col1, col2 = st.columns([2, 1])
 
 with col1:
@@ -50,33 +55,37 @@ with col1:
             entradas.append(num)
 
 soma = sum(entradas)
-ordenados = sorted(entradas)
+jogo_usuario = sorted(entradas)
 
 with col2:
-    st.write(f"**Relatório da Soma:** {soma}")
+    st.write(f"**Análise Técnica:**")
+    # Verificação de Soma
     if conf['min'] <= soma <= conf['max']:
-        st.success(f"✅ JOGO APROVADO (Soma Ideal)")
-        score = "100%"
+        st.success(f"✅ SOMA DENTRO DO PADRÃO ({soma})")
     else:
-        st.warning(f"⚠️ FORA DO PADRÃO ({conf['min']}-{conf['max']})")
-        score = "20%"
+        st.warning(f"⚠️ SOMA FORA DO PADRÃO ({soma})")
 
-# BOTÃO DE SALVAR (FIXO)
-if st.button("💾 SALVAR NO BANCO DE DADOS DE MATURAÇÃO"):
+    # BUSCA HISTÓRICA (O NOVO MOTOR)
+    if modalidade in dados_oficiais:
+        ja_saiu = False
+        for resultado in dados_oficiais[modalidade]:
+            if set(jogo_usuario) == set(resultado):
+                ja_saiu = True
+                break
+        
+        if ja_saiu:
+            st.error("🚨 ALERTA: Este jogo JÁ FOI SORTEADO anteriormente!")
+        else:
+            st.info("💎 Jogo Inédito no Banco de Teste.")
+
+# --- 4. SALVAMENTO ---
+if st.button("💾 SALVAR NO BANCO DE MATURAÇÃO"):
     st.session_state.banco_de_dados.append({
         "Data": datetime.now().strftime("%d/%m %H:%M"),
         "Loteria": modalidade, 
-        "Jogo": str(ordenados), 
-        "Soma": soma, 
-        "Força": score
+        "Jogo": str(jogo_usuario), 
+        "Soma": soma
     })
-    st.toast("Jogo registrado na memória!")
+    st.toast("Salvo com sucesso!")
 
-st.divider()
-
-# --- 4. BANCO DE DADOS (HISTÓRICO FIXO) ---
-st.subheader("📂 Jogos em Maturação")
-if st.session_state.banco_de_dados:
-    st.table(pd.DataFrame(st.session_state.banco_de_dados))
-else:
-    st.info("Aguardando o primeiro jogo para salvar.")
+st.table(pd.DataFrame(st.session_state.banco_de_dados))
