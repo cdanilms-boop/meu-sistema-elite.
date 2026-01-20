@@ -14,16 +14,17 @@ DEZENAS_ELITE = [10, 5, 53, 4, 33, 23, 54, 42, 37, 27, 30, 44, 17, 11, 29]
 
 @st.cache_data
 def carregar_historico():
+    # Simulando alguns concursos reais para o scanner testar
     return [
         {"concurso": "53", "data": "20/03/1997", "nums": {2, 3, 14, 17, 45, 50}},
-        {"concurso": "2700", "data": "15/01/2024", "nums": {2, 10, 17, 22, 30, 58}}
+        {"concurso": "2700", "data": "15/01/2024", "nums": {2, 10, 17, 22, 30, 58}},
+        {"concurso": "2750", "data": "18/07/2024", "nums": {1, 5, 14, 25, 33, 48}}
     ]
 
 # --- BARRA LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.header("📂 BANCO DE MATURAÇÃO")
     if st.session_state.banco_de_dados:
-        # Exibe a tabela compacta na lateral
         df_maturacao = pd.DataFrame(st.session_state.banco_de_dados)
         st.dataframe(df_maturacao[['Jogo', 'Soma']], hide_index=True)
         
@@ -74,7 +75,7 @@ if st.button("🔍 EXECUTAR SCANNER PROFISSIONAL"):
     
     col_a, col_b = st.columns(2)
     with col_a:
-        if c_min <= soma_u <= c_max: st.success(f"✅ SOMA: {soma_u} (OK)")
+        if c_min <= soma_u <= c_max: st.success(f"✅ SOMA: {soma_u} (DENTRO)")
         else: st.warning(f"⚠️ SOMA: {soma_u} (FORA DO PADRÃO)")
     with col_b:
         if pares in [2, 3, 4]: st.success(f"⚖️ PARIDADE: {pares}P/{impares}Í (EQUILIBRADO)")
@@ -105,7 +106,7 @@ if st.button("🔍 EXECUTAR SCANNER PROFISSIONAL"):
 
 # 3. SALVAMENTO
 st.divider()
-if st.button("💾 CONFIRMAR E ENVIAR PARA A LATERAL"):
+if st.button("💾 CONFIRMAR E ENVIAR PARA A MATURAÇÃO"):
     if len(meu_jogo) < 6:
         st.error("Preencha os 6 números.")
     else:
@@ -114,4 +115,5 @@ if st.button("💾 CONFIRMAR E ENVIAR PARA A LATERAL"):
             "Soma": soma_u, 
             "Paridade": f"{pares}P/{impares}Í"
         })
+        st.toast("Enviado para o Banco na Lateral!")
         st.rerun()
