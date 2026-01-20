@@ -1,120 +1,104 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 
-st.set_page_config(page_title="SISTEMA ELITE PRO - V5.0", layout="wide")
+st.set_page_config(page_title="SISTEMA ELITE PRO - V5.1", layout="wide")
 
-# --- INICIALIZAÇÃO DA MEMÓRIA ---
+# --- LÓGICA DE DATA DO PRÓXIMO SORTEIO ---
+def obter_proximo_sorteio():
+    hoje = datetime.now()
+    # Dias de sorteio da Mega-Sena: Terça(1), Quinta(3), Sábado(5)
+    dias_sorteio = [1, 3, 5]
+    proxima_data = hoje
+    
+    # Busca o próximo dia de sorteio
+    for i in range(1, 8):
+        candidato = hoje + timedelta(days=i)
+        if candidato.weekday() in dias_sorteio:
+            proxima_data = candidato
+            break
+            
+    semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+    nome_dia = semana[proxima_data.weekday()]
+    return f"{nome_dia}-feira, {proxima_data.strftime('%d/%m/%Y')}"
+
+# --- INICIALIZAÇÃO E API ---
 if 'banco_de_dados' not in st.session_state:
     st.session_state.banco_de_dados = []
 
-# --- FUNÇÃO DE BUSCA AUTOMÁTICA (API ATUALIZADA V5.0) ---
 @st.cache_data(ttl=3600)
 def carregar_dados_completos():
     try:
         url = "https://loteriascaixa-api.herokuapp.com/api/megasena"
         resposta = requests.get(url, timeout=10)
         dados = resposta.json()
-        
-        historico = []
-        for jogo in dados:
-            historico.append({
-                "concurso": jogo['concurso'],
-                "data": jogo['data'],
-                "nums": set(map(int, jogo['dezenas'])),
-                "lista_nums": sorted(map(int, jogo['dezenas'])),
-                "acumulou": jogo['acumulou'],
-                "proximo_estimado": jogo['valorEstimadoProximoConcurso']
-            })
-        return historico
+        ultimo = dados[0]
+        return {
+            "historico": dados,
+            "ultimo": {
+                "concurso": ultimo['concurso'],
+                "data": ultimo['data'],
+                "nums": sorted(map(int, ultimo['dezenas'])),
+                "acumulou": ultimo['acumulou'],
+                "valor": ultimo['valorEstimadoProximoConcurso']
+            }
+        }
     except:
-        return [{"concurso": "ERRO", "data": "-", "nums": {0}, "lista_nums": [0,0,0,0,0,0], "acumulou": False, "proximo_estimado": 0}]
+        return None
 
-# Carregamento
-historico_global = carregar_dados_completos()
-ultimo = historico_global[0]
+dados_api = carregar_dados_completos()
+info_proximo = obter_proximo_sorteio()
 
-# Cálculo de Frequência para o Gerador
-todas_dezenas = []
-for h in historico_global[:60]: # Analisa os últimos 60 dias
-    todas_dezenas.extend(list(h['nums']))
-freq = pd.Series(todas_dezenas).value_counts()
-DEZENAS_ELITE = freq.head(15).index.tolist()
-
-# --- BARRA LATERAL (PAINEL DE RESULTADOS) ---
+# --- BARRA LATERAL ATUALIZADA (V5.1) ---
 with st.sidebar:
-    st.title("🛡️ ELITE PRO 5.0")
+    st.title("🛡️ ELITE PRO 5.1")
     
-    # NOVO CARD DE RESULTADO (O que você pediu!)
-    st.subheader("🏁 Último Sorteio")
-    with st.container(border=True):
-        st.markdown(f"**Concurso {ultimo['concurso']}** ({ultimo['data']})")
-        # Mostra as dezenas bonitas
-        st.subheader(" ".join([f"[{n}]" for n in ultimo['lista_nums']]))
-        
-        if ultimo['acumulou']:
-            st.warning(f"💰 ACUMULOU!")
-            st.write(f"Estimado: R$ {ultimo['proximo_estimado']:,.2f}")
-        else:
-            st.success("✅ Teve Ganhador!")
+    if dados_api:
+        u = dados_api['ultimo']
+        st.subheader("🏁 Último Resultado")
+        with st.container(border=True):
+            st.markdown(f"**Concurso {u['concurso']}**")
+            st.subheader(" ".join([f"[{n}]" for n in u['nums']]))
+            if u['acumulou']:
+                st.warning(f"💰 ACUMULOU: R$ {u['valor']:,.2f}")
+            
+            st.divider()
+            # O QUE VOCÊ PEDIU: Próximo sorteio detalhado
+            st.markdown("📅 **PRÓXIMO SORTEIO:**")
+            st.info(f"**{info_proximo}**")
 
     st.divider()
-    
-    # Gerador Inteligente
-    st.header("✨ Gerador")
-    if st.button("SUGESTÃO BASEADA EM TENDÊNCIA"):
-        sug = sorted(random.sample(DEZENAS_ELITE, 3) + random.sample(range(1,61), 3))[:6]
-        st.code(sug)
-        
-    st.divider()
+    if st.button("✨ GERAR SUGESTÃO", use_container_width=True):
+        st.code(sorted(random.sample(range(1, 61), 6)))
 
-    # Banco de Maturação
+    st.divider()
     st.header("📂 MATURAÇÃO")
     if st.session_state.banco_de_dados:
         st.table(pd.DataFrame(st.session_state.banco_de_dados))
-        if st.button("🗑️ Limpar"):
-            st.session_state.banco_de_dados = []
-            st.rerun()
     
-    if st.button("💾 SALVAR SCANNER ATUAL", type="primary", use_container_width=True):
-        jogo_salvar = sorted([st.session_state[f"v_{i}"] for i in range(6)])
-        st.session_state.banco_de_dados.append({"Jogo": str(jogo_salvar), "Soma": sum(jogo_salvar)})
+    if st.button("💾 SALVAR ATUAL NA LATERAL", type="primary", use_container_width=True):
+        jogo_v = sorted([st.session_state[f"v_{i}"] for i in range(6)])
+        st.session_state.banco_de_dados.append({"Jogo": str(jogo_v), "Soma": sum(jogo_v)})
         st.rerun()
 
 # --- ÁREA CENTRAL ---
 st.title("🔎 SCANNER DE AUDITORIA GLOBAL")
-st.caption(f"Varrendo histórico oficial completo: {len(historico_global)} concursos analisados.")
-
 cols = st.columns(6)
 for i in range(6):
     with cols[i]:
         st.number_input(f"Nº {i+1}", 1, 60, key=f"v_{i}")
 
 meu_jogo = sorted([st.session_state[f"v_{i}"] for i in range(6)])
-soma_u = sum(meu_jogo)
-pares = len([n for n in meu_jogo if n % 2 == 0])
-
-if st.button("🔍 EXECUTAR SCANNER PROFISSIONAL", use_container_width=True):
+if st.button("🔍 EXECUTAR SCANNER", use_container_width=True):
     st.divider()
-    # Auditoria de Harvard e Paridade
-    c1, c2 = st.columns(2)
-    with c1:
-        if 150 <= soma_u <= 220: st.success(f"✅ SOMA: {soma_u} (DENTRO)")
-        else: st.warning(f"⚠️ SOMA: {soma_u} (FORA DO PADRÃO)")
-    with c2:
-        if pares in [2, 3, 4]: st.success(f"⚖️ PARIDADE: {pares}P/{6-pares}Í (OK)")
-        else: st.error(f"❌ PARIDADE: {pares}P/{6-pares}Í (RISCO)")
-
-    # Scanner de Ineditismo
-    conflitos = [h for h in historico_global if len(set(meu_jogo).intersection(h['nums'])) >= 4]
-    if conflitos:
-        for c in conflitos[:2]:
-            st.error(f"🚨 CONFLITO: {len(set(meu_jogo).intersection(c['nums']))} acertos no Conc. {c['concurso']}")
-        # Sugestão de correção
-        nova_sug = sorted(list(set(meu_jogo[:2]) | set(random.sample(DEZENAS_ELITE, 4))))
-        st.info(f"💡 **RECALIBRAGEM SUGERIDA:** {nova_sug}")
-    else:
-        st.balloons()
-        st.info("💎 JOGO 100% INÉDITO!")
+    soma = sum(meu_jogo)
+    if 150 <= soma <= 220: st.success(f"✅ SOMA: {soma} (DENTRO)")
+    else: st.warning(f"⚠️ SOMA: {soma} (FORA)")
+    
+    # Ineditismo (Varrendo os milhares de jogos que vimos na foto bd1d7f)
+    if dados_api:
+        conflitos = [j for j in dados_api['historico'] if len(set(meu_jogo).intersection(set(map(int, j['dezenas'])))) >= 4]
+        if not conflitos: st.info("💎 JOGO 100% INÉDITO!")
+        else: st.error(f"🚨 CONFLITO DETECTADO EM {len(conflitos)} CONCURSOS ANTERIORES.")
