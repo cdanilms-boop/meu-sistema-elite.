@@ -4,82 +4,72 @@ import requests
 from datetime import datetime, timedelta
 import random
 
-# 1. MOTOR DE DADOS (Não mexe na tela)
+# --- GAVETA 1: INTELIGÊNCIA E DADOS ---
 @st.cache_data(ttl=3600)
 def carregar_dados_caixa():
     try:
         url = "https://loteriascaixa-api.herokuapp.com/api/megasena"
-        dados = requests.get(url, timeout=10).json()
-        return dados
-    except:
-        return []
+        return requests.get(url, timeout=10).json()
+    except: return []
 
 def calcular_proximo_sorteio():
     hoje = datetime.now()
-    dias = [1, 3, 5] # Terça, Quinta, Sábado
+    dias = [1, 3, 5] # Ter, Qui, Sab
     for i in range(1, 8):
         prox = hoje + timedelta(days=i)
         if prox.weekday() in dias:
             semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
-            return f"{semana[prox.weekday()]}-feira, {prox.strftime('%d/%m/%Y')}"
+            return f"{semana[prox.weekday()]}, {prox.strftime('%d/%m')}"
     return "A definir"
 
-# 2. CONFIGURAÇÃO DA LATARIA
-st.set_page_config(page_title="ELITE PRO V5.3", layout="wide")
-
-# Inicialização de memória
+# --- GAVETA 2: INTERFACE ---
+st.set_page_config(page_title="ELITE PRO V5.4", layout="wide")
 if 'banco' not in st.session_state: st.session_state.banco = []
 
-# Carga de dados
-historico_real = carregar_dados_caixa()
-if historico_real:
-    ultimo = historico_real[0]
-    # Cálculo de dezenas quentes para o Gerador
+hist_real = carregar_dados_caixa()
+dezenas_quentes = []
+if hist_real:
+    ultimo = hist_real[0]
+    # Pega as 20 dezenas mais frequentes dos últimos 100 jogos para sugestões fortes
     todas = []
-    for h in historico_real[:50]: todas.extend(map(int, h['dezenas']))
-    dezenas_quentes = pd.Series(todas).value_counts().head(15).index.tolist()
+    for h in hist_real[:100]: todas.extend(map(int, h['dezenas']))
+    dezenas_quentes = pd.Series(todas).value_counts().head(20).index.tolist()
 
-# --- BARRA LATERAL (PAINEL DE CONTROLE) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    st.title("🛡️ PAINEL DE CONTROLE")
-    
-    if historico_real:
+    st.title("🛡️ PAINEL ELITE")
+    if hist_real:
         with st.container(border=True):
             st.markdown(f"**CONCURSO {ultimo['concurso']}**")
             st.subheader(" ".join([f"[{n}]" for n in ultimo['dezenas']]))
             if ultimo['acumulou']:
-                st.warning(f"💰 ACUMULADO: R$ {ultimo['valorEstimadoProximoConcurso']:,.2f}")
+                st.warning(f"💰 R$ {ultimo['valorEstimadoProximoConcurso']:,.2f}")
             st.info(f"📅 Próximo: {calcular_proximo_sorteio()}")
 
     st.divider()
-    
-    # VOLTOU: Gerador de Sugestões
-    st.header("✨ Gerador Elite")
-    if st.button("GERAR SUGESTÃO INTELIGENTE"):
-        sug = sorted(random.sample(dezenas_quentes, 3) + random.sample(range(1,61), 3))[:6]
+    st.header("✨ Gerador")
+    if st.button("SUGESTÃO DE ELITE"):
+        sug = sorted(random.sample(dezenas_quentes, 4) + random.sample(range(1,61), 2))[:6]
         st.success(f"Sugestão: {sug}")
 
     st.divider()
-    
-    # VOLTOU: Banco de Maturação
     st.header("📂 MATURAÇÃO")
     if st.session_state.banco:
         st.dataframe(pd.DataFrame(st.session_state.banco), hide_index=True)
-        if st.button("🗑️ Limpar"):
+        if st.button("🗑️ Limpar Banco"):
             st.session_state.banco = []
             st.rerun()
-    
-    if st.button("💾 SALVAR JOGO ATUAL", type="primary", use_container_width=True):
-        jogo_v = sorted([st.session_state[f"v_{i}"] for i in range(6)])
-        st.session_state.banco.append({"Jogo": str(jogo_v), "Soma": sum(jogo_v)})
-        st.toast("Jogo salvo com sucesso!")
-        st.rerun()
 
-# --- ÁREA CENTRAL (EXECUÇÃO DO SCANNER) ---
+    if st.button("💾 SALVAR NO BANCO", type="primary", use_container_width=True):
+        j_atual = sorted(list(set([st.session_state[f"v_{i}"] for i in range(6)])))
+        if len(j_atual) == 6:
+            st.session_state.banco.append({"Jogo": str(j_atual), "Soma": sum(j_atual)})
+            st.rerun()
+
+# --- ÁREA CENTRAL ---
 st.title("🔎 SCANNER DE AUDITORIA GLOBAL")
-st.caption(f"Analisando histórico oficial: {len(historico_real)} concursos carregados.")
+st.caption(f"Histórico Oficial: {len(hist_real)} concursos analisados.")
 
-# Entrada de números
 cols = st.columns(6)
 for i in range(6):
     with cols[i]:
@@ -89,31 +79,48 @@ meu_jogo = sorted(list(set([st.session_state[f"v_{i}"] for i in range(6)])))
 
 if st.button("🚀 EXECUTAR SCANNER PROFISSIONAL", use_container_width=True):
     if len(meu_jogo) < 6:
-        st.error("Por favor, insira 6 números diferentes.")
+        st.error("Insira 6 dezenas diferentes.")
     else:
         st.divider()
         soma = sum(meu_jogo)
         pares = len([n for n in meu_jogo if n % 2 == 0])
         
-        # Auditoria Visual
         c1, c2 = st.columns(2)
         with c1:
             if 150 <= soma <= 220: st.success(f"✅ SOMA: {soma} (IDEAL)")
             else: st.warning(f"⚠️ SOMA: {soma} (FORA DO PADRÃO)")
         with c2:
-            if pares in [2, 3, 4]: st.success(f"⚖️ PARIDADE: {pares}P/{6-pares}Í (OK)")
+            if pares in [2, 3, 4]: st.success(f"⚖️ PARIDADE: {pares}P/{6-pares}Í (EQUILIBRADO)")
             else: st.error(f"❌ PARIDADE: {pares}P/{6-pares}Í (ALTO RISCO)")
 
-        # VOLTOU: Verificação de Ineditismo Global
-        conflitos = [h for h in historico_real if len(set(meu_jogo).intersection(set(map(int, h['dezenas'])))) >= 4]
-        
+        # Lógica de Ineditismo com Recalibragem Cirúrgica
+        conflitos = []
+        for h in hist_real:
+            sorteados = set(map(int, h['dezenas']))
+            iguais = set(meu_jogo).intersection(sorteados)
+            if len(iguais) >= 4:
+                conflitos.append({"conc": h['concurso'], "data": h['data'], "nums": iguais})
+
         if not conflitos:
             st.balloons()
             st.info("💎 JOGO 100% INÉDITO NA HISTÓRIA!")
         else:
-            for conf in conflitos[:2]:
-                st.error(f"🚨 CONCURSO {conf['concurso']} ({conf['data']}): {len(set(meu_jogo).intersection(set(map(int, conf['dezenas']))))} ACERTOS.")
+            for c in conflitos[:3]:
+                st.error(f"🚨 CONCURSO {c['conc']} ({c['data']}): {len(c['nums'])} ACERTOS -> {sorted(list(c['nums']))}")
             
-            # Recalibragem Automática
-            nova_sug = sorted(list(set(meu_jogo[:2]) | set(random.sample(dezenas_quentes, 4))))
-            st.info(f"💡 **SUGESTÃO DE TROCA:** {nova_sug}")
+            # RECALIBRAGEM FORTE (Mantém a base, troca o conflito)
+            st.markdown("### 🛠️ RECALIBRAGEM DE PRECISÃO:")
+            # Tenta gerar uma sugestão que resolva o problema da soma e do conflito
+            tentativas = 0
+            while tentativas < 100:
+                # Mantém 2 ou 3 números originais que não estavam no conflito principal se possível
+                base_limpa = [n for n in meu_jogo if n not in conflitos[0]['nums']]
+                if len(base_limpa) < 2: base_limpa = meu_jogo[:2]
+                
+                complemento = random.sample(dezenas_quentes, 6 - len(base_limpa))
+                final = sorted(list(set(base_limpa + complemento)))[:6]
+                
+                if 150 <= sum(final) <= 220:
+                    st.success(f"✅ SUGESTÃO VALIDADA: {final} (Soma: {sum(final)})")
+                    break
+                tentativas += 1
