@@ -3,45 +3,28 @@ import pandas as pd
 from datetime import datetime
 import random
 
-# CONFIGURAÇÃO DE ENGENHARIA
-st.set_page_config(page_title="SISTEMA ELITE PRO - DATABASE", layout="wide")
+st.set_page_config(page_title="SISTEMA ELITE PRO - SCANNER DETALHADO", layout="wide")
 
 if 'banco_de_dados' not in st.session_state:
     st.session_state.banco_de_dados = []
 
-# FUNÇÃO DO ENGENHEIRO: Carregar Base Histórica
+# SIMULAÇÃO DE BANCO COMPLETO COM DATAS (Preparando para o CSV real)
 @st.cache_data
-def carregar_historico_completo(loteria):
-    # Aqui simularemos a carga de 2700 concursos para o teste de performance
-    # Na próxima fase, conectaremos o arquivo .CSV oficial
-    data = []
-    for i in range(1, 2701):
-        data.append({
-            "concurso": str(i),
-            "data": f"Sorteio {i}",
-            "nums": set(random.sample(range(1, 61), 6)) # Simulando para teste de carga
-        })
-    return data
+def carregar_historico_detalhado():
+    # Simulando alguns sorteios reais com datas para o seu teste
+    return [
+        {"concurso": "53", "data": "20/03/1997", "nums": {2, 3, 14, 17, 45, 50}},
+        {"concurso": "2600", "data": "10/06/2023", "nums": {5, 9, 32, 44, 49, 57}},
+        {"concurso": "2700", "data": "15/01/2024", "nums": {2, 10, 17, 22, 30, 58}}
+    ]
 
-st.title("⚙️ MOTOR ELITE PRO - INTEGRAÇÃO TOTAL")
+st.title("⚙️ MOTOR ELITE PRO - SCANNER DETALHADO")
 
-# --- PAINEL DE CONTROLE ---
-modalidade = st.sidebar.selectbox("Base de Dados Ativa:", ["Mega-Sena", "Lotofácil"])
-regras = {"Mega-Sena": [150, 220, 6, 60], "Lotofácil": [170, 220, 15, 25]}
-c_min, c_max, c_qtd, c_n = regras[modalidade]
+# --- ENTRADA DE DADOS ---
+modalidade = st.sidebar.selectbox("Base de Dados:", ["Mega-Sena"])
+c_min, c_max, c_qtd, c_n = 150, 220, 6, 60
 
-# --- 1. GERADOR DE ELITE (COM FILTRO DE SOMA) ---
-if st.button("✨ GERAR JOGO COM FILTRO DE HARVARD"):
-    for _ in range(500):
-        sugestao = sorted(random.sample(range(1, c_n + 1), c_qtd))
-        if c_min <= sum(sugestao) <= c_max:
-            st.success(f"💎 JOGO GERADO: {sugestao} (Soma: {sum(sugestao)})")
-            break
-
-st.divider()
-
-# --- 2. SCANNER DE HISTÓRICO REAL ---
-st.subheader("🔎 Scanner de Volante (Busca em 2.700 Concursos)")
+st.subheader("🔎 Scanner de Volante Profissional")
 cols = st.columns(6)
 entradas = []
 for i in range(c_qtd):
@@ -49,37 +32,42 @@ for i in range(c_qtd):
         num = st.number_input(f"Nº {i+1}", 1, c_n, key=f"n_{i}")
         entradas.append(num)
 
-if st.button("🔍 EXECUTAR SCANNER PROFISSIONAL"):
-    historico = carregar_historico_completo(modalidade)
+if st.button("🔍 EXECUTAR SCANNER COM DATAS E DEZENAS"):
+    historico = carregar_historico_detalhado()
     meu_jogo = set(entradas)
     soma_u = sum(entradas)
     
-    st.write("### 📊 Relatório da Auditoria")
+    st.markdown("### 📊 Relatório Detalhado de Auditoria")
     
     # Validação de Soma
     if c_min <= soma_u <= c_max:
-        st.success(f"✅ Soma {soma_u} aprovada pela metodologia.")
+        st.success(f"✅ Soma {soma_u} aprovada.")
     else:
-        st.warning(f"⚠️ Soma {soma_u} fora do padrão sugerido.")
+        st.warning(f"⚠️ Soma {soma_u} fora do padrão (150-220).")
 
-    # Busca por Quadras, Quinas e Senas em TODO o histórico
-    resultados_encontrados = []
+    # Busca Profunda
+    encontrou_algo = False
     for h in historico:
-        acertos = len(meu_jogo.intersection(h['nums']))
+        interseccao = meu_jogo.intersection(h['nums'])
+        acertos = len(interseccao)
+        
         if acertos >= 4:
-            resultados_encontrados.append(f"🎯 {acertos} ACERTOS no Concurso {h['concurso']}")
+            encontrou_algo = True
+            st.error(f"🚨 ACERTO ENCONTRADO: {acertos} dezenas no Concurso {h['concurso']} em {h['data']}")
+            st.write(f"👉 **Números que já saíram:** {sorted(list(interseccao))}")
+            st.info(f"💡 Sugestão do Engenheiro: Considere manter {sorted(list(interseccao))[:2]} e rotacionar os outros.")
 
-    if resultados_encontrados:
-        st.error(f"🚨 Alerta: Foram encontradas {len(resultados_encontrados)} ocorrências parciais no passado!")
-        for r in resultados_encontrados[:10]: # Mostra os 10 primeiros
-            st.write(r)
-    else:
-        st.info("💎 JOGO INÉDITO: Este conjunto de números nunca premiou com 4, 5 ou 6 acertos.")
+    if not encontrou_algo:
+        st.info("💎 JOGO INÉDITO: Nenhuma coincidência de 4+ números encontrada no histórico.")
 
 st.divider()
-# --- 3. BANCO DE MATURAÇÃO ---
+# --- SALVAMENTO ---
 if st.button("💾 SALVAR PARA MATURAÇÃO"):
-    st.session_state.banco_de_dados.append({"Data": datetime.now(), "Jogo": str(entradas), "Soma": sum(entradas)})
+    st.session_state.banco_de_dados.append({
+        "Data Registro": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "Jogo": str(sorted(entradas)),
+        "Soma": soma_u
+    })
     st.toast("Registrado!")
 
 st.table(pd.DataFrame(st.session_state.banco_de_dados))
