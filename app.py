@@ -5,14 +5,14 @@ from datetime import datetime, timedelta
 import random
 
 # ==============================================================================
-# 🧠 MOTOR DE INTELIGÊNCIA ESTATÍSTICA (SEM ALEATORIEDADE BARATA)
+# 🔧 MOTOR INDUSTRIAL V6.3 - BLINDADO CONTRA ERROS
 # ==============================================================================
 
 class MotorElite:
     def __init__(self):
         self.url_api = "https://loteriascaixa-api.herokuapp.com/api/megasena"
         self.historico = self._carregar_dados()
-        self.dezenas_quentes = self._calcular_frequencia_real()
+        self.dezenas_quentes = self._calcular_quentes()
     
     @st.cache_data(ttl=3600)
     def _carregar_dados(_self):
@@ -21,172 +21,99 @@ class MotorElite:
             return r.json() if r.status_code == 200 else []
         except: return []
 
-    def _calcular_frequencia_real(self):
-        """Calcula matematicamente os números mais fortes dos últimos 100 jogos."""
+    def _calcular_quentes(self):
         if not self.historico: return list(range(1,61))
         todas = []
-        # Analisa os últimos 100 concursos para pegar a tendência atual
         for h in self.historico[:100]: todas.extend(map(int, h['dezenas']))
-        # Retorna o TOP 25 mais frequentes
-        return pd.Series(todas).value_counts().head(25).index.tolist()
+        return pd.Series(todas).value_counts().head(20).index.tolist()
 
-    def get_info_painel(self):
+    def get_info_completa(self):
         if not self.historico: return None
         u = self.historico[0]
+        # Cálculo da Data Próxima
+        hoje = datetime.now()
+        dias = [1, 3, 5]
+        prox_txt = "A definir"
+        for i in range(1, 8):
+            f = hoje + timedelta(days=i)
+            if f.weekday() in dias:
+                semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+                prox_txt = f"{semana[f.weekday()]}-feira, {f.strftime('%d/%m/%Y')}"
+                break
+        return {"conc": u['concurso'], "dz": sorted(map(int, u['dezenas'])), "acum": u['acumulou'], "valor": u['valorEstimadoProximoConcurso'], "prox": prox_txt}
+
+    def analisar(self, jogo):
+        # SANITIZAÇÃO: Remove repetidos e garante 6 números
+        jogo_limpo = sorted(list(set([n for n in jogo if 1 <= n <= 60])))
+        if len(jogo_limpo) < 6: return {"status": "erro", "msg": "Insira 6 dezenas diferentes."}
+        
+        soma = sum(jogo_limpo)
+        pares = len([n for n in jogo_limpo if n % 2 == 0])
+        conflitos = [h for h in self.historico if len(set(jogo_limpo).intersection(set(map(int, h['dezenas'])))) >= 4]
+        
         return {
-            "concurso": u['concurso'],
-            "dezenas": sorted([int(d) for d in u['dezenas']]),
-            "acumulou": u['acumulou'],
-            "valor": u['valorEstimadoProximoConcurso']
+            "status": "sucesso", "jogo": jogo_limpo, "soma": soma, "soma_ok": 150 <= soma <= 220,
+            "pares": pares, "paridade_ok": pares in [2, 3, 4], "conflitos": conflitos, "inedito": len(conflitos) == 0
         }
 
-    def validar_regras_ouro(self, jogo):
-        """
-        APLICA A METODOLOGIA COMPLETA EM UM JOGO.
-        Retorna um dicionário com o diagnóstico completo.
-        """
-        jogo = sorted(list(set(jogo)))
-        soma = sum(jogo)
-        pares = len([n for n in jogo if n % 2 == 0])
+    def recalibrar(self, jogo_atual):
+        # Garante que temos uma base válida mesmo se o jogo original for ruim
+        base = list(set(jogo_atual))
+        if len(base) < 3: base = random.sample(self.dezenas_quentes, 3)
+        else: base = random.sample(base, 3)
         
-        # Regra 1: Soma de Harvard
-        soma_ok = 150 <= soma <= 220
-        
-        # Regra 2: Paridade Equilibrada
-        paridade_ok = pares in [2, 3, 4]
-        
-        # Regra 3: Histórico (Ineditismo)
-        conflitos = []
-        if self.historico:
-            for h in self.historico:
-                acertos = len(set(jogo).intersection(set(map(int, h['dezenas']))))
-                if acertos >= 4: # Se já deu quadra, quina ou sena, é ruim.
-                    conflitos.append(h)
-        
-        inedito = len(conflitos) == 0
-
-        return {
-            "jogo": jogo,
-            "soma": soma,
-            "soma_ok": soma_ok,
-            "pares": pares,
-            "paridade_ok": paridade_ok,
-            "conflitos": conflitos,
-            "aprovado_total": soma_ok and paridade_ok and inedito
-        }
-
-    def gerar_sugestao_inteligente(self):
-        """
-        LOOP DE EXCELÊNCIA:
-        Não sai daqui até gerar um jogo que passe em TODAS as regras.
-        """
-        tentativas = 0
-        while tentativas < 1000: # Proteção contra loop infinito
-            # Estratégia: 4 Quentes (Estatística) + 2 da Base Geral (Surpresa)
-            base = random.sample(self.dezenas_quentes, 4)
-            resto = random.sample(range(1,61), 2)
-            candidato = sorted(list(set(base + resto)))
-            
-            if len(candidato) == 6:
-                # O Motor se auto-audita antes de entregar ao usuário
-                analise = self.validar_regras_ouro(candidato)
-                if analise['aprovado_total']:
-                    return candidato # Só retorna se for PERFEITO
-            tentativas += 1
-        
-        return sorted(random.sample(range(1,61), 6)) # Fallback (muito raro acontecer)
-
-    def recalibrar_cirurgico(self, jogo_ruim):
-        """
-        Conserta um jogo ruim mantendo a essência, mas removendo o erro.
-        """
-        # Tenta salvar 3 números originais do usuário
-        base_usuario = random.sample(jogo_ruim, 3) 
-        
-        for _ in range(200): # Tenta 200 combinações diferentes com essa base
-            complemento = random.sample(self.dezenas_quentes, 3)
-            novo_jogo = sorted(list(set(base_usuario + complemento)))
-            
-            if len(novo_jogo) == 6:
-                analise = self.validar_regras_ouro(novo_jogo)
-                if analise['aprovado_total']:
-                    return novo_jogo
-        
-        # Se não der com a base do usuário, gera um novo Perfeito
-        return self.gerar_sugestao_inteligente()
+        for _ in range(300):
+            cand = sorted(list(set(base + random.sample(self.dezenas_quentes, 3))))
+            if len(cand) == 6:
+                res = self.analisar(cand)
+                if res['soma_ok'] and res['inedito']: return cand
+        return sorted(random.sample(self.dezenas_quentes, 6))
 
 # ==============================================================================
-# 🖥️ INTERFACE V6.2
+# 🎨 INTERFACE INTEGRADA (NÃO MAIS SUMIRÁ NADA)
 # ==============================================================================
-st.set_page_config(page_title="ELITE PRO V6.2", layout="wide")
-motor = MotorElite()
+st.set_page_config(page_title="ELITE PRO 6.3", layout="wide")
+if 'motor' not in st.session_state: st.session_state.motor = MotorElite()
+m = st.session_state.motor
 
-if 'banco' not in st.session_state: st.session_state.banco = []
-
+# SIDEBAR RESTAURADA
 with st.sidebar:
-    st.title("🛡️ CONTROLE 6.2")
-    info = motor.get_info_painel()
+    st.title("🛡️ CONTROLE DE ELITE")
+    info = m.get_info_completa()
     if info:
-        st.success(f"Base Atualizada: Conc. {info['concurso']}")
+        with st.container(border=True):
+            st.markdown(f"**CONCURSO {info['conc']}**")
+            st.subheader(f"{info['dz']}")
+            if info: st.info(f"📅 PRÓXIMO: {info['prox']}")
+            if info['acum']: st.warning(f"💰 ESTIMADO: R$ {info['valor']:,.2f}")
     
     st.divider()
-    st.markdown("### 🧠 Gerador de Metodologia")
-    if st.button("GERAR SUGESTÃO DE ELITE"):
-        with st.spinner("O Motor está calculando probabilidades..."):
-            sug = motor.gerar_sugestao_inteligente()
-            st.success(f"Sugestão: {sug}")
-            st.caption(f"Soma: {sum(sug)} | Validado: Inédito + Quentes")
+    if st.button("✨ GERAR JOGO METODOLÓGICO"):
+        sug = m.recalibrar(random.sample(range(1,61), 6))
+        st.success(f"Sugestão: {sug}")
 
-    st.divider()
-    if st.session_state.banco:
-        st.dataframe(pd.DataFrame(st.session_state.banco), hide_index=True)
-        if st.button("Limpar"): st.session_state.banco = []; st.rerun()
-
-# --- ÁREA DE TRABALHO ---
-st.title("🔎 SCANNER DE AUDITORIA 6.2")
-st.caption("O único scanner que aplica regras de Harvard e Ineditismo simultaneamente.")
-
+# ÁREA CENTRAL
+st.title("🔎 SCANNER DE AUDITORIA")
 cols = st.columns(6)
 for i in range(6):
-    with cols[i]: st.number_input(f"Dz {i+1}", 1, 60, key=f"v_{i}")
+    with cols[i]: st.number_input(f"Nº {i+1}", 1, 60, key=f"n_{i}")
 
-meu_jogo = sorted(list(set([st.session_state[f"v_{i}"] for i in range(6)])))
+meu_jogo = [st.session_state[f"n_{i}"] for i in range(6)]
 
-if st.button("🚀 AUDITAR AGORA", type="primary", use_container_width=True):
-    analise = motor.validar_regras_ouro(meu_jogo)
-    
-    st.divider()
-    # 1. VISUALIZAÇÃO DOS DADOS
-    c1, c2 = st.columns(2)
-    c1.metric("SOMA (Meta: 150-220)", analise['soma'], "✅ APROVADO" if analise['soma_ok'] else "⚠️ FORA DO PADRÃO")
-    c2.metric("PARIDADE", f"{analise['pares']} Pares", "✅ EQUILIBRADO" if analise['paridade_ok'] else "⚠️ DESEQUILIBRADO")
-
-    # 2. VEREDITO DO MOTOR
-    if analise['aprovado_total']:
-        st.balloons()
-        st.success("💎 JOGO PERFEITO! Aprovado em Soma, Paridade e Ineditismo Histórico.")
-        if st.button("Salvar este Jogo"):
-            st.session_state.banco.append({"Jogo": str(meu_jogo), "Status": "💎 ELITE"})
-            st.rerun()
+if st.button("🚀 EXECUTAR AUDITORIA", type="primary", use_container_width=True):
+    res = m.analisar(meu_jogo)
+    if res['status'] == 'erro':
+        st.error(res['msg'])
     else:
-        # Se falhou, explica por que
-        if not analise['conflitos']:
-            st.warning("⚠️ O jogo é Inédito, mas falhou na Soma ou Paridade.")
-        else:
-            st.error(f"🚨 REPROVADO: Jogo já premiado {len(analise['conflitos'])} vezes.")
-            for c in analise['conflitos'][:2]:
-                st.write(f"🔴 **Concurso {c['concurso']}**: {c['dezenas']}")
+        st.divider()
+        c1, c2 = st.columns(2)
+        c1.metric("SOMA", res['soma'], "DENTRO" if res['soma_ok'] else "FORA")
+        c2.metric("PARIDADE", f"{res['pares']}P", "OK" if res['paridade_ok'] else "RISCO")
 
-        # 3. SOLUÇÃO AUTOMÁTICA (RECALIBRAGEM)
-        st.markdown("---")
-        st.subheader("🛠️ Solução do Engenheiro (Recalibragem)")
-        st.info("O sistema manteve parte da sua base e injetou DEZENAS QUENTES para corrigir o erro.")
-        
-        novo_jogo = motor.recalibrar_cirurgico(meu_jogo)
-        
-        col_a, col_b = st.columns([3, 1])
-        with col_a:
-            st.success(f"✅ JOGO CORRIGIDO: {novo_jogo}")
-        with col_b:
-            st.caption(f"Soma: {sum(novo_jogo)}")
-            st.caption("Status: 100% Validado")
+        if res['inedito']:
+            st.success("💎 JOGO INÉDITO!")
+        else:
+            st.error(f"🚨 CONFLITOS: {len(res['conflitos'])} sorteios anteriores.")
+            st.subheader("🛠️ RECALIBRAGEM DO ENGENHEIRO")
+            novo = m.recalibrar(res['jogo'])
+            st.success(f"✅ JOGO CORRIGIDO: {novo} (Soma: {sum(novo)})")
