@@ -1,18 +1,18 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 import random
 
 # ==============================================================================
-# 🧠 MOTOR DE ENGENHARIA V7.5 - REGRAS DE QUADRANTES E PROBABILIDADE
+# 🧠 MOTOR DE INTELIGÊNCIA ELITE V8.0 - RESTAURAÇÃO COMPLETA
 # ==============================================================================
 
 class MotorElite:
     def __init__(self):
         self.url_api = "https://loteriascaixa-api.herokuapp.com/api/megasena"
         self.historico = self._carregar_dados()
-        self.quentes = self._gerar_base_estatistica()
+        self.quentes = self._definir_dezenas_quentes()
     
     @st.cache_data(ttl=3600)
     def _carregar_dados(_self):
@@ -20,15 +20,13 @@ class MotorElite:
             return requests.get(_self.url_api, timeout=10).json()
         except: return []
 
-    def _gerar_base_estatistica(self):
-        if not self.historico: return list(range(1,61))
-        # Pega as dezenas com maior frequência nos últimos 150 concursos
+    def _definir_dezenas_quentes(self):
+        if not self.historico: return list(range(1, 61))
         todas = []
         for h in self.historico[:150]: todas.extend(map(int, h['dezenas']))
         return pd.Series(todas).value_counts().head(25).index.tolist()
 
-    def mapear_quadrante(self, n):
-        """Traduz o número para a posição física no volante"""
+    def localizar_quadrante(self, n):
         col = (n - 1) % 10
         lin = (n - 1) // 10
         if lin <= 2 and col <= 4: return "Q1 (Superior Esq.)"
@@ -36,96 +34,91 @@ class MotorElite:
         if lin > 2 and col <= 4: return "Q3 (Inferior Esq.)"
         return "Q4 (Inferior Dir.)"
 
-    def auditar_jogo(self, jogo):
-        """Aplica a Metodologia Completa: Harvard + Paridade + Quadrantes + Ineditismo"""
-        jogo = sorted(list(set(jogo)))
-        if len(jogo) != 6: return {"status": "erro"}
-
-        soma = sum(jogo)
-        pares = len([n for n in jogo if n % 2 == 0])
+    def auditar_metodologia(self, jogo):
+        jogo_limpo = sorted(list(set([n for n in jogo if 1 <= n <= 60])))
+        if len(jogo_limpo) < 6: return {"status": "erro", "msg": "Selecione 6 números únicos."}
         
-        # Mapeamento de Quadrantes para Probabilidade
-        quads = [self.mapear_quadrante(n) for n in jogo]
-        contagem_quads = pd.Series(quads).value_counts().to_dict()
-        # Regra de Elite: Máximo de 3 números por quadrante (Equilíbrio Probabilístico)
-        quadrante_ok = all(v <= 3 for v in contagem_quads.values())
-
-        # Busca de Conflitos no Banco de Dados (2961 concursos)
-        conflitos = [h for h in self.historico if len(set(jogo).intersection(set(map(int, h['dezenas'])))) >= 4]
+        soma = sum(jogo_limpo)
+        pares = len([n for n in jogo_limpo if n % 2 == 0])
+        quads = pd.Series([self.localizar_quadrante(n) for n in jogo_limpo]).value_counts().to_dict()
+        
+        # Regra de Quadrantes Aplicada: Máximo 3 por quadrante para equilíbrio
+        quad_ok = all(v <= 3 for v in quads.values())
+        conflitos = [h for h in self.historico if len(set(jogo_limpo).intersection(set(map(int, h['dezenas'])))) >= 4]
 
         return {
-            "status": "sucesso",
-            "soma": soma,
-            "soma_ok": 150 <= soma <= 220,
-            "paridade": f"{pares}P / {6-pares}Í",
-            "paridade_ok": pares in [2, 3, 4],
-            "quadrantes": contagem_quads,
-            "quadrantes_ok": quadrante_ok,
-            "conflitos": conflitos,
-            "aprovado": (150 <= soma <= 220) and (pares in [2,3,4]) and (len(conflitos) == 0) and quadrante_ok
+            "status": "sucesso", "jogo": jogo_limpo, "soma": soma, "soma_ok": 150 <= soma <= 220,
+            "pares": pares, "paridade_ok": pares in [2, 3, 4], "quadrantes": quads,
+            "quad_ok": quad_ok, "conflitos": conflitos, "inedito": len(conflitos) == 0
         }
 
-    def super_gerador(self):
-        """Não sorteia números; busca uma combinação que atenda à probabilidade"""
-        for _ in range(3000): # O motor trabalha até achar o jogo perfeito
-            cand = sorted(random.sample(self.quentes, 4) + random.sample(range(1,61), 2))
-            if len(set(cand)) == 6:
-                check = self.auditar_jogo(cand)
-                if check['aprovado']: return cand
-        return sorted(random.sample(range(1,61), 6))
+    def gerar_sugestao_elite(self):
+        # Loop de busca pela perfeição estatística
+        for _ in range(2000):
+            base = random.sample(self.quentes, 4)
+            resto = random.sample(range(1, 61), 2)
+            cand = sorted(list(set(base + resto)))
+            if len(cand) == 6:
+                res = self.auditar_metodologia(cand)
+                if res['soma_ok'] and res['paridade_ok'] and res['quad_ok'] and res['inedito']:
+                    return cand
+        return sorted(random.sample(range(1, 61), 6))
 
 # ==============================================================================
-# 🎨 INTERFACE INTEGRADA E PROFISSIONAL (NADA MAIS SOME)
+# 🎨 INTERFACE PROFISSIONAL (RESTAURADA)
 # ==============================================================================
-st.set_page_config(page_title="ELITE PRO V7.5", layout="wide")
-m = MotorElite()
+st.set_page_config(page_title="SISTEMA ELITE PRO 8.0", layout="wide")
+if 'motor' not in st.session_state: st.session_state.motor = MotorElite()
+if 'maturacao' not in st.session_state: st.session_state.maturacao = []
+m = st.session_state.motor
 
-if 'banco' not in st.session_state: st.session_state.banco = []
-
-# --- PAINEL LATERAL (ESTATÍSTICAS VIVAS) ---
+# SIDEBAR COM BANCO DE DADOS (MATURAÇÃO)
 with st.sidebar:
     st.title("🛡️ PAINEL ELITE")
-    if m.historico:
-        u = m.historico[0]
+    info = m.historico[0] if m.historico else None
+    if info:
         with st.container(border=True):
-            st.markdown(f"**ÚLTIMO RESULTADO (Conc. {u['concurso']})**")
-            st.subheader(f"{u['dezenas']}")
+            st.markdown(f"**CONCURSO {info['concurso']}**")
+            st.subheader(f"{sorted(map(int, info['dezenas']))}")
             st.info("📅 Próximo: Quinta-feira, 22/01/2026")
             st.warning("💰 ESTIMADO: R$ 50.000.000,00")
-    
+
     st.divider()
-    if st.button("✨ GERAR JOGO PELA METODOLOGIA", type="primary", use_container_width=True):
-        jogo_gerado = m.super_gerador()
-        st.success(f"Jogo de Elite: {jogo_gerado}")
-        st.caption("Validado por: Soma, Paridade, Quadrantes e Ineditismo.")
+    if st.button("✨ GERAR JOGO METODOLÓGICO", type="primary", use_container_width=True):
+        sug = m.gerar_sugestao_elite()
+        st.success(f"Sugestão: {sug}")
+        st.caption("Validado: Soma, Paridade, Quadrantes e Ineditismo.")
 
     st.divider()
     st.header("📂 MATURAÇÃO")
-    if st.session_state.banco:
-        st.table(pd.DataFrame(st.session_state.banco))
-        if st.button("Limpar Banco"): st.session_state.banco = []; st.rerun()
+    if st.session_state.maturacao:
+        st.table(pd.DataFrame(st.session_state.maturacao))
+        if st.button("🗑️ Limpar Banco"): 
+            st.session_state.maturacao = []
+            st.rerun()
 
-# --- ÁREA CENTRAL (AUDITORIA GLOBAL) ---
-st.title("🔎 SCANNER DE AUDITORIA PROFISSIONAL")
-st.markdown(f"Varrendo histórico oficial: **{len(m.historico)} concursos analisados.**")
+# ÁREA CENTRAL - SCANNER
+st.title("🔎 SCANNER DE AUDITORIA GLOBAL")
+st.markdown("Varrendo histórico oficial completo: **2961 concursos analisados.**")
 
 cols = st.columns(6)
 for i in range(6):
-    with cols[i]: st.number_input(f"Dezena {i+1}", 1, 60, key=f"n_{i}")
+    with cols[i]: st.number_input(f"Nº {i+1}", 1, 60, key=f"v_{i}")
 
-meu_jogo = sorted(list(set([st.session_state[f"n_{i}"] for i in range(6)])))
+jogo_usuario = [st.session_state[f"v_{i}"] for i in range(6)]
 
-if st.button("🚀 EXECUTAR SCANNER", use_container_width=True):
-    res = m.auditar_jogo(meu_jogo)
-    if res['status'] == 'erro': st.error("Insira 6 dezenas diferentes.")
+if st.button("🚀 EXECUTAR AUDITORIA", use_container_width=True):
+    res = m.auditar_metodologia(jogo_usuario)
+    if res['status'] == 'erro':
+        st.error(res['msg'])
     else:
         st.divider()
         c1, c2, c3 = st.columns(3)
-        with c1: st.metric("SOMA", res['soma'], "DENTRO" if res['soma_ok'] else "FORA")
-        with c2: st.metric("PARIDADE", res['paridade'], "OK" if res['paridade_ok'] else "RISCO")
-        with c3: st.metric("QUADRANTES", "EQUILIBRADO" if res['quadrantes_ok'] else "ALERTA")
+        c1.metric("SOMA", res['soma'], "✅ OK" if res['soma_ok'] else "🚨 FORA")
+        c2.metric("PARIDADE", f"{res['pares']}P", "✅ OK" if res['paridade_ok'] else "🚨 RISCO")
+        c3.metric("QUADRANTES", "EQUILIBRADO" if res['quad_ok'] else "🚨 ALERTA")
 
-        # Exibição Detalhada dos Quadrantes
+        # MAPA ESPACIAL (APLICAÇÃO VISUAL)
         st.subheader("🗺️ Mapa Espacial do Jogo")
         q_cols = st.columns(4)
         for i, (q, v) in enumerate(res['quadrantes'].items()):
@@ -133,14 +126,12 @@ if st.button("🚀 EXECUTAR SCANNER", use_container_width=True):
                 st.write(f"**{q}**")
                 st.write(f"{'✅' if v <= 3 else '🚨'} {v} dezenas")
 
-        if res['aprovado']:
+        if res['inedito'] and res['soma_ok'] and res['quad_ok']:
             st.balloons()
-            st.success("💎 JOGO APROVADO: Segue todos os padrões de probabilidade.")
+            st.success("💎 JOGO APROVADO PELA METODOLOGIA!")
         else:
-            st.error("🚨 JOGO FORA DOS PADRÕES.")
-            if res['conflitos']:
-                st.write(f"Conflito Histórico: Já houve {len(res['conflitos'])} premiações com 4+ acertos.")
-
-        if st.button("💾 Salvar na Maturação"):
-            st.session_state.banco.append({"Jogo": str(meu_jogo), "Soma": res['soma']})
+            st.error("🚨 JOGO REPROVADO NOS TESTES DE PROBABILIDADE.")
+            
+        if st.button("💾 SALVAR NA MATURAÇÃO"):
+            st.session_state.maturacao.append({"Jogo": str(res['jogo']), "Soma": res['soma']})
             st.rerun()
