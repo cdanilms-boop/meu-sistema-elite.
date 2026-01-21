@@ -1,29 +1,55 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy import stats
-import random
+import collections
 
-class MotorDePrecisao:
-    def __init__(self, dados_iniciais):
-        self.dados = np.array(dados_iniciais)
-        self.agentes = ["Analista", "Auditor", "Estrategista"]
+class SistemaOperacionalDePrecisao:
+    def __init__(self, dados):
+        self.dados = np.array(dados)
+        self.media = np.mean(self.dados)
+        self.desvio = np.std(self.dados)
 
-    def analisar_probabilidade(self):
-        # Aplica Distribuição Normal para encontrar desvios
-        media = np.mean(self.dados)
-        desvio = np.std(self.dados)
-        # Probabilidade de ocorrência baseada na curva de Gauss
-        probabilidades = stats.norm.pdf(self.dados, media, desvio)
-        return probabilidades
+    def calcular_logica_avancada(self):
+        # 1. Entropia (Nível de desordem)
+        contagem = collections.Counter(self.dados)
+        probs = [v / len(self.dados) for v in contagem.values()]
+        entropia = stats.entropy(probs)
+        
+        # 2. Probabilidades de Gauss
+        probabilidades = stats.norm.pdf(self.dados, self.media, self.desvio)
+        
+        return entropia, probabilidades
 
-    def gerar_sequencia_aleatoria(self, tamanho=10):
-        # Uso de sementes baseadas em entropia do sistema para maior precisão
-        return [random.SystemRandom().random() for _ in range(tamanho)]
+    def mostrar_painel_visual(self, entropia):
+        # Criando o gráfico para não ficar tela em branco
+        x = np.linspace(self.media - 4*self.desvio, self.media + 4*self.desvio, 100)
+        y = stats.norm.pdf(x, self.media, self.desvio)
 
-    def filtro_de_pertinencia(self):
-        # Aqui entra a lógica de "Grande Matemático" - Ex: Sequência de Fibonacci ou Cadeias de Markov
-        pass
+        plt.figure(figsize=(12, 6))
+        
+        # Gráfico da Curva
+        plt.subplot(1, 2, 1)
+        plt.plot(x, y, color='blue', label='Área de Pertinência')
+        plt.fill_between(x, y, alpha=0.2, color='blue')
+        plt.scatter(self.dados, [0]*len(self.dados), color='red', label='Sequência Atual')
+        plt.title(f"Distribuição Estatística\n(Entropia: {entropia:.4f})")
+        plt.legend()
 
-# Exemplo de execução
-dados = [10, 12, 11, 13, 11, 10, 15, 12] # Exemplo de sequências
-motor = MotorDePrecisao(dados)
-print(f"Probabilidades Calculadas: {motor.analisar_probabilidade()}")
+        # Gráfico de Tendência (O que vem a seguir)
+        plt.subplot(1, 2, 2)
+        plt.plot(self.dados, 'o-', color='green')
+        plt.title("Fluxo da Sequência no Tempo")
+        plt.grid(True)
+
+        print("Lógica processada. Abrindo painel visual...")
+        plt.tight_layout()
+        plt.show()
+
+# --- EXECUÇÃO INTEGRADA ---
+# Coloque aqui a sua sequência de dados
+minha_sequencia = [10, 12, 11, 13, 11, 10, 15, 12, 14, 11]
+
+# O Sistema une o motor com a tela
+sistema = SistemaOperacionalDePrecisao(minha_sequencia)
+entropia_calculada, probs_calculadas = sistema.calcular_logica_avancada()
+sistema.mostrar_painel_visual(entropia_calculada)
