@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import random
 
 # ==========================================
-# MOTOR DE DADOS ELITE (ESTÁVEL)
+# MOTOR DE DADOS ELITE (ESTÁVEL + DATA DINÂMICA)
 # ==========================================
 @st.cache_data(ttl=3600)
 def carregar_dados_oficiais():
@@ -13,6 +13,17 @@ def carregar_dados_oficiais():
         url = "https://loteriascaixa-api.herokuapp.com/api/megasena"
         return requests.get(url, timeout=10).json()
     except: return []
+
+def calcular_proximo_sorteio():
+    """Calcula automaticamente o próximo dia de sorteio (Ter, Qui, Sab)"""
+    hoje = datetime.now()
+    dias_sorteio = [1, 3, 5] # Terça(1), Quinta(3), Sábado(5)
+    for i in range(1, 8):
+        prox = hoje + timedelta(days=i)
+        if prox.weekday() in dias_sorteio:
+            semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+            return f"{semana[prox.weekday()]}-feira, {prox.strftime('%d/%m/%Y')}"
+    return "A definir"
 
 def identificar_quadrante(n):
     col = (n - 1) % 10
@@ -23,9 +34,9 @@ def identificar_quadrante(n):
     return "Q4"
 
 # ==========================================
-# INTERFACE ELITE (BASE DO 3º CÓDIGO)
+# INTERFACE ELITE (ESTRUTURA DO 3º CÓDIGO)
 # ==========================================
-st.set_page_config(page_title="ELITE PRO V11.0", layout="wide")
+st.set_page_config(page_title="ELITE PRO V11.5", layout="wide")
 if 'banco' not in st.session_state: st.session_state.banco = []
 
 historico = carregar_dados_oficiais()
@@ -43,6 +54,8 @@ with st.sidebar:
             st.write(f"**CONCURSO {ult['concurso']}**")
             st.subheader(" ".join([f"[{n}]" for n in ult['dezenas']]))
             st.warning(f"💰 ACUMULADO: R$ {ult['valorEstimadoProximoConcurso']:,.2f}")
+            # RESTAURADO: Data do próximo sorteio calculada automaticamente
+            st.info(f"📅 PRÓXIMO: {calcular_proximo_sorteio()}")
 
     st.divider()
     st.header("✨ GERADOR")
@@ -61,19 +74,18 @@ with st.sidebar:
             st.session_state.banco = []
             st.rerun()
     
-    # SALVAMENTO MANUAL (RESTAURADO)
     if st.button("💾 CONFIRMAR E SALVAR JOGO", type="primary", use_container_width=True):
         jogo_atual = sorted(list(set([st.session_state[f"v_{i}"] for i in range(6)])))
         if len(jogo_atual) == 6:
             st.session_state.banco.append({"Jogo": str(jogo_atual), "Soma": sum(jogo_atual)})
-            st.toast("Jogo salvo!")
+            st.toast("Jogo enviado para maturação!")
             st.rerun()
 
 # --- ÁREA CENTRAL: SCANNER E MAPA ---
 st.title("🔎 SCANNER DE AUDITORIA GLOBAL")
 cols = st.columns(6)
 for i in range(6):
-    with cols[i]: st.number_input(f"Nº {i+1}", 1, 60, key=f"v_{i}")
+    with cols[i]: st.number_input(f"Dezena {i+1}", 1, 60, key=f"v_{i}")
 
 meu_jogo = sorted(list(set([st.session_state[f"v_{i}"] for i in range(6)])))
 
@@ -87,13 +99,11 @@ if st.button("🚀 EXECUTAR SCANNER PROFISSIONAL", use_container_width=True):
         quads = [identificar_quadrante(n) for n in meu_jogo]
         dist_q = pd.Series(quads).value_counts().to_dict()
 
-        # MÉTRICAS TIPO 3º CÓDIGO
         c1, c2, c3 = st.columns(3)
-        with c1: st.metric("SOMA", soma, "DENTRO" if 150 <= soma <= 220 else "FORA")
+        with c1: st.metric("SOMA", soma, "FORA" if soma < 150 or soma > 220 else "OK")
         with c2: st.metric("PARIDADE", f"{pares}P / {6-pares}Í")
         with c3: st.info(f"🗺️ QUADRANTES: {dist_q}")
 
-        # ALTERAÇÃO DO 2º CÓDIGO: CONFLITOS DETALHADOS (TRANSPARÊNCIA)
         conflitos = [h for h in historico if len(set(meu_jogo).intersection(set(map(int, h['dezenas'])))) >= 4]
         
         if not conflitos:
@@ -107,9 +117,8 @@ if st.button("🚀 EXECUTAR SCANNER PROFISSIONAL", use_container_width=True):
                 
                 with st.expander(f"🔴 Concurso {conf['concurso']} - {len(repetidos)} acertos", expanded=True):
                     st.write(f"**Sorteados na época:** {dezenas_hist}")
-                    st.write(f"**Dezenas que repetiram no seu jogo:** `{repetidos}`")
+                    st.write(f"**Repetiram no seu jogo:** `{repetidos}`")
             
-            # RECALIBRAGEM DO 2º CÓDIGO
             st.divider()
             st.subheader("💡 RECALIBRAGEM SUGERIDA")
             nova_sug = set(random.sample(dezenas_elite, 4))
